@@ -1,9 +1,13 @@
 package com.geji.domform;
 
+import cn.lunadeer.dominion.api.DominionAPI;
 import cn.lunadeer.dominion.api.dtos.DominionDTO;
 import cn.lunadeer.dominion.api.dtos.MemberDTO;
+import cn.lunadeer.dominion.api.dtos.PlayerDTO;
 import cn.lunadeer.dominion.api.dtos.flag.PriFlag;
+import cn.lunadeer.dominion.events.dominion.modify.DominionReSizeEvent;
 import cn.lunadeer.dominion.events.dominion.modify.DominionSetMessageEvent;
+import cn.lunadeer.dominion.providers.DominionProvider;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.geysermc.cumulus.form.SimpleForm;
@@ -12,6 +16,7 @@ import org.geysermc.cumulus.form.ModalForm;
 import org.geysermc.cumulus.util.FormImage;
 import org.geysermc.floodgate.api.FloodgateApi;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -193,20 +198,19 @@ public class FormManager {
     
     private static void openLandManagementForm(Player player, DominionDTO dominion, JavaPlugin plugin) {
         try {
-            SimpleForm.Builder form = SimpleForm.builder()
-                    .title("管理领地：" + dominion.getName())
-                    .content("领地名称：" + dominion.getName())
-                    .button("编辑权限", FormImage.Type.PATH, "textures/items/name_tag.png")
-                    .button("添加成员", FormImage.Type.PATH, "textures/items/name_tag.png")
-                    .button("移除成员", FormImage.Type.PATH, "textures/items/name_tag.png")
-                    .button("设置进入/离开消息", FormImage.Type.PATH, "textures/ui/store_home_icon.png")
-                    .button("传送点设置", FormImage.Type.PATH, "textures/items/ender_pearl.png")
-                    .button("§a<< 返回主菜单", FormImage.Type.PATH, "textures/ui/worldsIcon.png");
-            
+            SimpleForm.Builder form = SimpleForm.builder().title("管理领地：" + dominion.getName()).content("领地名称：" + dominion.getName());
+            form.button("编辑权限", FormImage.Type.PATH, "textures/items/name_tag.png");
+            form.button("添加成员", FormImage.Type.PATH, "textures/items/name_tag.png");
+            form.button("移除成员", FormImage.Type.PATH, "textures/items/name_tag.png");
+            form.button("设置进入/离开消息", FormImage.Type.PATH, "textures/ui/store_home_icon.png");
+            form.button("传送点设置", FormImage.Type.PATH, "textures/items/ender_pearl.png");
+            form.button("转让领地", FormImage.Type.PATH, "textures/items/bed_red.png.png");
+            form.button("调整领地大小", FormImage.Type.PATH, "textures/items/name_tag.png");
+            form.button("§a<< 返回主菜单", FormImage.Type.PATH, "textures/ui/worldsIcon.png");
             form.validResultHandler((response) -> {
                 switch (response.clickedButtonId()) {
                     case 0:
-                        openPermissionForm(player, dominion, plugin);
+                        openLandPermissionForm(player, dominion, plugin);
                         break;
                     case 1:
                         openAddMemberForm(player, dominion, plugin);
@@ -218,10 +222,21 @@ public class FormManager {
                         openSetMessageForm(player, dominion, plugin);
                         break;
                     case 4:
-                        player.sendMessage("§e传送点设置功能尚未实现");
-                        openLandManagementForm(player, dominion, plugin);
+                        try {
+                            dominion.setTpLocation(player.getLocation());
+                            player.sendMessage("§l§a设置成功");
+                        } catch (SQLException e) {
+                            player.sendMessage("§l§a设置失败，错误信息: §f"+e.getMessage());
+                            throw new RuntimeException(e);
+                        }
                         break;
                     case 5:
+                        transferDominion(player,dominion);
+                        break;
+                    case 6:
+                        setDominionSize(player,dominion);
+                        break;
+                    case 7:
                         openMainMenu(player, plugin);
                         break;
                 }
@@ -234,13 +249,73 @@ public class FormManager {
             e.printStackTrace();
         }
     }
-    
-    // 重载方法，用于从领地管理界面直接打开权限设置
-    private static void openPermissionForm(Player player, DominionDTO dominion, JavaPlugin plugin) {
-        // 直接跳转到领地权限设置界面
-        openLandPermissionForm(player, dominion, plugin);
+
+    private static void transferDominion(Player player,DominionDTO dominionDTO){
+        CustomForm.Builder form = CustomForm.builder().title("转让领地");
+        form.input("§c这是一个十分危险的操作！\n§f玩家名:");
+        form.validResultHandler(r->{
+            String name = r.asInput(0);
+            PlayerDTO target = DominionManager.getDominionAPI().getPlayer(name);
+            if (target != null) {
+                DominionProvider.getInstance().transferDominion(player,dominionDTO,target);
+            } else {
+                player.sendMessage("§c玩家不存在！");
+            }
+        });
+        FloodgateApi.getInstance().sendForm(player.getUniqueId(), form.build());
     }
-    
+
+    private static void setDominionSize(Player player, DominionDTO dominionDTO) {
+        CustomForm.Builder form = CustomForm.builder().title("调整领地大小");
+        form.label("§f请输入领地各方向的新大小:");
+        form.input("§6北(z-)的大小", "请输入新的大小", "");
+        form.input("§6南(z+)的大小", "请输入新的大小", "");
+        form.input("§6西(x-)的大小", "请输入新的大小", "");
+        form.input("§6东(x+)的大小", "请输入新的大小", "");
+        form.input("§6上(y+)的大小", "请输入新的大小", "");
+        form.input("§6下(y-)的大小", "请输入新的大小", "");
+        form.validResultHandler(r -> {
+            int northSize = Integer.parseInt(r.asInput(0));
+            int southSize = Integer.parseInt(r.asInput(1));
+            int westSize = Integer.parseInt(r.asInput(2));
+            int eastSize = Integer.parseInt(r.asInput(3));
+            int upSize = Integer.parseInt(r.asInput(4));
+            int downSize = Integer.parseInt(r.asInput(5));
+            CompletableFuture<DominionDTO> future = DominionAPI.getDominionProvider().resizeDominion(player, dominionDTO, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.NORTH, northSize);
+            future
+                    .thenCompose(resizedDominion ->
+                            // 继续调整南方
+                            DominionAPI.getDominionProvider().resizeDominion(player, resizedDominion, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.SOUTH, southSize)
+                    )
+                    .thenCompose(resizedDominion ->
+                            // 继续调整西方
+                            DominionAPI.getDominionProvider().resizeDominion(player, resizedDominion, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.WEST, westSize)
+                    )
+                    .thenCompose(resizedDominion ->
+                            // 继续调整东方
+                            DominionAPI.getDominionProvider().resizeDominion(player, resizedDominion, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.EAST, eastSize)
+                    )
+                    .thenCompose(resizedDominion ->
+                            // 继续调整上方
+                            DominionAPI.getDominionProvider().resizeDominion(player, resizedDominion, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.UP, upSize)
+                    )
+                    .thenCompose(resizedDominion ->
+                            // 继续调整下方
+                            DominionAPI.getDominionProvider().resizeDominion(player, resizedDominion, DominionReSizeEvent.TYPE.EXPAND, DominionReSizeEvent.DIRECTION.DOWN, downSize)
+                    )
+                    .thenAccept(resizedDominion -> {
+                        player.sendMessage("领地大小已成功更新！");
+                    })
+                    .exceptionally(ex -> {
+                        player.sendMessage("调整领地大小时发生错误: " + ex.getMessage());
+                        return null;
+                    });
+        });
+
+        // 发送表单到玩家的游戏客户端
+        FloodgateApi.getInstance().sendForm(player.getUniqueId(), form.build());
+    }
+
     private static void openPermissionForm(Player player, JavaPlugin plugin) {
         try {
             List<DominionDTO> playerDominions = DominionManager.getPlayerDominions(player);

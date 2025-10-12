@@ -2,8 +2,7 @@ name: Domform
 version: '1.0-SNAPSHOT'
 main: com.geji.domform.Domform
 api-version: '1.21'
-depend: [floodgate]
-softdepend: [Dominion]
+depend: ["floodgate","Dominion"]
 
 commands:
   domform:

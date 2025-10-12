@@ -10,6 +10,7 @@ import cn.lunadeer.dominion.api.dtos.CuboidDTO;
 import cn.lunadeer.dominion.events.dominion.modify.DominionSetMessageEvent;
 import cn.lunadeer.dominion.providers.DominionProvider;
 import cn.lunadeer.dominion.providers.MemberProvider;
+import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -20,7 +21,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class DominionManager {
+    @Getter
     private static DominionAPI dominionAPI = null;
+    @Getter
     private static boolean initialized = false;
 
     /**
@@ -48,15 +51,6 @@ public class DominionManager {
             plugin.getLogger().warning("未找到Dominion插件，相关功能将不可用");
             return false;
         }
-    }
-
-    /**
-     * 检查是否已初始化
-     *
-     * @return 是否已初始化
-     */
-    public static boolean isInitialized() {
-        return initialized;
     }
 
     /**
