@@ -1,0 +1,4 @@
+modules:
+  dom:
+    # 是否启用domform模块
+    enabled: true
