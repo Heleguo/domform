@@ -25,7 +25,23 @@ public class DominionManager {
     private static DominionAPI dominionAPI = null;
     @Getter
     private static boolean initialized = false;
-
+    
+    /**
+     * 检查是否已初始化
+     * @return 是否已初始化
+     */
+    public static boolean isInitialized() {
+        return initialized;
+    }
+    
+    /**
+     * 获取DominionAPI实例
+     * @return DominionAPI实例
+     */
+    public static DominionAPI getDominionAPI() {
+        return dominionAPI;
+    }
+    
     /**
      * 初始化DominionAPI
      *
@@ -221,5 +237,20 @@ public class DominionManager {
     public static List<PriFlag> getAllPriFlags() {
         if (!initialized) return List.of();
         return Flags.getAllPriFlagsEnable();
+    }
+    
+    /**
+     * 设置成员权限标志
+     *
+     * @param dominion 领地
+     * @param member 成员
+     * @param flag 权限标志
+     * @param value 标志值
+     * @return 更新后的成员
+     */
+    public static CompletableFuture<MemberDTO> setMemberFlag(DominionDTO dominion, MemberDTO member, PriFlag flag, boolean value) {
+        if (!initialized) return CompletableFuture.completedFuture(null);
+        // 使用MemberProvider来设置成员权限
+        return MemberProvider.getInstance().setMemberFlag(Bukkit.getConsoleSender(), dominion, member, flag, value);
     }
 }
